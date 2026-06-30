@@ -22,14 +22,26 @@ class LLMClient:
         except Exception as e:
             return f"Error connecting to LM Studio: {str(e)}"
 
-    def reconstruct_sentence(self, sentence, template_type, temperature=0.7):
-        """Rebuilds a single sentence using a specific structural template."""
+    def reconstruct_sentence(self, sentence, template_type, temperature=0.7, history=None):
+        """Rebuilds a single sentence using a specific structural template with history and strict flow constraints."""
         templates = {
-            "punchy": "Rewrite this sentence to be very short and punchy (under 10 words). Avoid all fluff.",
-            "sprawl": "Rewrite this sentence to be long and complex (over 25 words), using subordinate clauses, but keep it natural.",
-            "inverted": "Rewrite this sentence so it does NOT start with the subject. Start with a prepositional phrase or an adverb."
+            "punchy": "Rewrite this sentence to be concise and impactful (under 12 words). It must feel like a natural human observation, not a robotic summary.",
+            "sprawl": "Rewrite this sentence to be longer and more descriptive (over 20 words), using a complex structure with subordinate clauses. Ensure it flows naturally into the next thought.",
+            "inverted": "Rewrite this sentence so it does NOT start with the subject. Use an introductory phrase or adverb to shift the focus, making it sound like a natural human transition."
         }
-        prompt = f"{templates[template_type]}\n\nOriginal: {sentence}\n\nProvide ONLY the rewritten sentence."
+        
+        history_context = ""
+        if history:
+            history_context = "\nPrevious attempts (Avoid repeating these specific phrasings):\n" + "\n".join([f"- {h[0]}" for h in history])
+
+        prompt = (
+            f"You are a professional editor. Rewrite the following sentence using this constraint: {templates[template_type]}\n"
+            f"{history_context}\n\n"
+            f"Original Sentence: {sentence}\n\n"
+            f"CRITICAL: The result must be grammatically perfect and sound like it was written by a high-level human writer. "
+            f"Avoid 'AI-isms' (e.g., avoid starting with 'In a world...', 'Moreover', or using overly dramatic adjectives).\n\n"
+            f"Provide ONLY the rewritten sentence."
+        )
         return self.generate(prompt, temperature=temperature)
 
     def humanize_pipeline(self, text, persona="professional", temperature=0.7):
@@ -68,14 +80,16 @@ class LLMClient:
             )
             return self.generate(recompose_prompt, temperature=temperature)
 
-    def polish_cohesion(self, text, temperature=0.5):
-        """Final pass to ensure flow and readability without losing structural variance."""
+    def polish_cohesion(self, text, temperature=0.4):
+        """Final pass to restore elegance while strictly avoiding AI-typical 'smoothing' patterns."""
         prompt = (
-            f"The following text has been structurally varied for rhythm. "
-            f"Please refine it for natural flow and cohesion. "
-            f"CRITICAL: Do not 'smooth out' the sentence lengths. Keep the short punchy sentences "
-            f"and the long complex ones exactly where they are, but ensure the transitions between them "
-            f"are smooth and grammatically correct.\n\n"
+            f"Act as a world-class editor. The following text has been structurally varied for rhythm. "
+            f"Your goal is to make it read elegantly and fluidly, but you MUST avoid the 'AI-smoothness' trap.\n\n"
+            f"STRICT CONSTRAINTS:\n"
+            f"1. NO AI TRANSITIONS: Absolutely ban words like 'Moreover', 'Furthermore', 'Additionally', or 'In conclusion'.\n"
+            f"2. PRESERVE THE JOLT: Keep the contrast between very short and very long sentences. Do not average them out.\n"
+            f"3. HUMAN CONNECTORS: Use organic, slightly less predictable transitions (e.g., 'The thing is', 'And yet', 'Truth be told') or simply start the sentence cold.\n"
+            f"4. AVOID OVER-POLISHING: If a sentence sounds slightly idiosyncratic but clear, leave it alone. Do not make it 'perfect'.\n\n"
             f"Text:\n{text}"
         )
         return self.generate(prompt, temperature=temperature)

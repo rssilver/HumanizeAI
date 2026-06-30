@@ -46,58 +46,68 @@ col1, col2 = st.columns(2)
 with col1:
     input_text = st.text_area("Input AI Text", height=300, placeholder="Paste your AI-generated text here...")
 
-if st.button("Humanize Text"):
-    if not input_text:
-        st.warning("Please enter some text first!")
-    else:
-        with st.spinner("Iterating to improve humanity score..."):
-            # Progress tracking
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            # We manually run the loop here to update UI per iteration
-            current_text = input_text
-            final_score = 0
-            iteration = 0
-            scores_history = [] # Track scores for graphing
-            
-            while iteration < max_iters:
-                score, _ = judge.analyze(current_text)
-                status_text.text(f"Iteration {iteration}: Humanity Score = {score:.2f}%")
-                progress_bar.progress((iteration / max_iters))
+    if st.button("Humanize Text"):
+        if not input_text:
+            st.warning("Please enter some text first!")
+        else:
+            with st.spinner("Iterating to improve humanity score..."):
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 
-                # Store score for the graph
-                scores_history.append(score)
+                current_text = input_text
+                final_score = 0
+                iteration = 0
+                scores_history = []
+                texts_history = [input_text]
                 
-                if score >= threshold:
+                while iteration < max_iters:
+                    score, _ = judge.analyze(current_text)
+                    status_text.text(f"Iteration {iteration}: Humanity Score = {score:.2f}%")
+                    progress_bar.progress((iteration / max_iters))
+                    
+                    scores_history.append(score)
+                    texts_history.append(current_text)
+                    
+                    if score >= threshold:
+                        final_score = score
+                        break
+                    
+                    current_text = llm_client.humanize_pipeline(current_text, persona=selected_persona, temperature=temp_start + (iteration * 0.1))
+                    iteration += 1
                     final_score = score
-                    break
+
+                progress_bar.empty()
+                status_text.empty()
                 
-                current_text = llm_client.humanize_pipeline(current_text, persona=selected_persona, temperature=temp_start + (iteration * 0.1))
-                iteration += 1
-                final_score = score
+                st.session_state['last_result'] = current_text
+                st.session_state['last_score'] = final_score
+                st.session_state['history_texts'] = texts_history
+                st.session_state['history_scores'] = scores_history
 
-            progress_bar.empty()
-            status_text.empty()
-            
-            with col2:
-                st.subheader("Humanized Result")
-                st.write(current_text)
-                st.metric("Final Humanity Score", f"{final_score:.2f}%")
-                if final_score >= threshold:
-                    st.success("Threshold reached!")
-                else:
-                    st.info("Max iterations reached without hitting threshold.")
+                with col2:
+                    st.subheader("Humanized Result")
+                    st.write(current_text)
+                    st.metric("Final Humanity Score", f"{final_score:.2f}%")
+                    if final_score >= threshold:
+                        st.success("Threshold reached!")
+                    else:
+                        st.info("Max iterations reached without hitting threshold.")
 
-                # Display the progress graph
-                if len(scores_history) > 0:
-                    st.subheader("Humanization Progress")
-                    chart_data = pd.DataFrame({
-                        "Iteration": [f"Iter {i}" for i in range(len(scores_history))],
-                        "Score": scores_history
-                    })
-                    st.bar_chart(data=chart_data, x="Iteration", y="Score")
+                    if len(scores_history) > 0:
+                        st.subheader("Humanization Progress")
+                        chart_data = pd.DataFrame({
+                            "Iteration": [f"Iter {i}" for i in range(len(scores_history))],
+                            "Score": scores_history
+                        })
+                        st.bar_chart(data=chart_data, x="Iteration", y="Score")
 
-                st.subheader("Original vs Humanized")
-                st.text_area("Original", value=input_text, height=150, disabled=True)
-                st.text_area("Humanized", value=current_text, height=150, disabled=True)
+                    with st.expander("View Iteration History"):
+                        for i in range(len(texts_history)):
+                            s = scores_history[i] if i < len(scores_history) else "N/A"
+                            st.markdown(f"**Iteration {i}** (Score: {s})")
+                            st.text(texts_history[i])
+                            st.divider()
+
+                    st.subheader("Original vs Humanized")
+                    st.text_area("Original", value=input_text, height=150, disabled=True)
+                    st.text_area("Humanized", value=current_text, height=150, disabled=True)
