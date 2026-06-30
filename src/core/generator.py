@@ -23,23 +23,29 @@ class LLMClient:
             return f"Error connecting to LM Studio: {str(e)}"
 
     def reconstruct_sentence(self, sentence, template_type, temperature=0.7, history=None):
-        """Rebuilds a single sentence using a specific structural template with history and strict flow constraints."""
+        """Rebuilds a single sentence using the 'Pattern-Slayer' logic to eliminate AI anchors."""
         templates = {
-            "punchy": "Rewrite this sentence to be concise and impactful (under 12 words). It must feel like a natural human observation, not a robotic summary.",
-            "sprawl": "Rewrite this sentence to be longer and more descriptive (over 20 words), using a complex structure with subordinate clauses. Ensure it flows naturally into the next thought.",
-            "inverted": "Rewrite this sentence so it does NOT start with the subject. Use an introductory phrase or adverb to shift the focus, making it sound like a natural human transition."
+            "punchy": "Rewrite this as a concise, impactful human observation (under 12 words). Avoid all fluff and robotic summaries.",
+            "sprawl": "Rewrite this as a natural, flowing complex sentence (over 20 words) with subordinate clauses. It must sound like an organic thought, not a generated list.",
+            "inverted": "Rewrite this starting with an introductory phrase or adverb to shift the focus. It must feel like a natural human transition."
         }
         
         history_context = ""
         if history:
-            history_context = "\nPrevious attempts (Avoid repeating these specific phrasings):\n" + "\n".join([f"- {h[0]}" for h in history])
+            history_context = "\nPrevious attempts (Avoid these specific phrasings):\n" + "\n".join([f"- {h[0]}" for h in history])
 
         prompt = (
-            f"You are a professional editor. Rewrite the following sentence using this constraint: {templates[template_type]}\n"
+            f"You are a ruthless professional editor. Your goal is to strip away 'AI-isms'—the predictable structural anchors that detectors use.\n\n"
+            f"STRICT TRANSFORMATION RULES:\n"
+            f"1. KILL THE SIGNPOSTS: Remove words like 'Furthermore', 'Moreover', 'Consequently', and 'In conclusion'. Start the sentence directly.\n"
+            f"2. BREAK SYMMETRY: If a sentence is balanced (While X, Y), break it into asymmetrical parts or change the rhythm.\n"
+            f"3. DELETE FLUFF PAIRS: Replace adjective pairs (e.g., 'comprehensive and nuanced') with one precise word or a concrete detail.\n"
+            f"4. GROUND THE INTRO: Remove generic openings about 'the modern digital world' or 'the era of X'.\n"
+            f"5. SIMPLIFY VERBS: Replace high-frequency AI verbs (underscores, facilitates, delves) with natural alternatives.\n"
+            f"6. NO SUMMARY TONE: Avoid wrapping up thoughts with 'Overall' or 'Ultimately'.\n\n"
+            f"CONSTRAINT: {templates[template_type]}\n"
             f"{history_context}\n\n"
             f"Original Sentence: {sentence}\n\n"
-            f"CRITICAL: The result must be grammatically perfect and sound like it was written by a high-level human writer. "
-            f"Avoid 'AI-isms' (e.g., avoid starting with 'In a world...', 'Moreover', or using overly dramatic adjectives).\n\n"
             f"Provide ONLY the rewritten sentence."
         )
         return self.generate(prompt, temperature=temperature)
